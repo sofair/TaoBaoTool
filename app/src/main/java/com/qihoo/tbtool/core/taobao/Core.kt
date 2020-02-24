@@ -11,6 +11,7 @@ import android.view.Window
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
+import com.instacart.library.truetime.TrueTimeRx
 import com.mm.red.expansion.showHintDialog
 import com.qihoo.tbtool.core.taobao.event.ClickBuyEvent
 import com.qihoo.tbtool.core.taobao.event.OrderChooseEvent
@@ -18,8 +19,13 @@ import com.qihoo.tbtool.core.taobao.event.SubmitOrderEvent
 import com.qihoo.tbtool.core.taobao.view.ChooseTime
 import com.qihoo.tbtool.expansion.l
 import com.qihoo.tbtool.expansion.mainScope
+import io.reactivex.observers.DisposableSingleObserver
+import io.reactivex.schedulers.Schedulers
+import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.*
-import java.util.ArrayList
+import java.util.*
+import kotlin.math.min
+
 
 object Core {
 
@@ -60,19 +66,17 @@ object Core {
         SubmitOrderEvent.execute(activity)
     }
 
-    /**
-     * 开始定时抢购
-     */
-    fun statTimeGo(chooseTime: ChooseTime, activity: Activity) {
+    fun addScheledJob(chooseTime: ChooseTime, activity: Activity) {
         val context = activity.applicationContext
         val intent = activity.intent.clone() as Intent
         val itemId = intent.getStringExtra("item_id") ?: ""
 
-
-        val job = GlobalScope.launch {
+        var job = GlobalScope.launch {
             while (true) {
-                val currentTimeMillis = System.currentTimeMillis()
+                val currentTimeMillis =
+                    if (chooseTime.useTrueTime) TrueTimeRx.now().time else System.currentTimeMillis()
                 val time = chooseTime.time() - currentTimeMillis
+
                 l("执行倒计时: $time")
 
                 if (time <= 0) {
@@ -82,12 +86,59 @@ object Core {
                 }
 
                 mainScope.launch {
-                    Toast.makeText(activity, "剩余:" + time / 1000 + "秒", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(activity, "剩余:" + time / 1000.0 + ( if (chooseTime.useTrueTime) "s" else "秒"), Toast.LENGTH_SHORT)
+                        .show()
                 }
-                delay(1000)
+                delay(min(1000L, time))
             }
         }
         JobManagers.addJob(itemId, job)
+    }
+
+    /**
+     * 开始定时抢购
+     */
+    fun statTimeGo(chooseTime: ChooseTime, activity: Activity) {
+        val context = activity.applicationContext
+        val intent = activity.intent.clone() as Intent
+        val itemId = intent.getStringExtra("item_id") ?: ""
+
+        if (chooseTime.useTrueTime) {
+            // 启动TrueTime
+            TrueTimeRx.build()
+                .initializeRx("ntp.aliyun.com")
+                .subscribeOn(Schedulers.io())
+                .subscribe(
+                    object : DisposableSingleObserver<Date>() {
+                        override fun onSuccess(date: Date) { // work with the resulting todos...
+                            mainScope.launch {
+                                Toast.makeText(
+                                    activity,
+                                    "TrueTime was initialized and we have a time from ntp.aliyun.com: $date",
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            }
+                            addScheledJob(chooseTime, activity)
+                            dispose()
+                        }
+                        override fun onError(throwable: Throwable) { // handle the error case...
+                            throwable.printStackTrace()
+                            mainScope.launch {
+                                Toast.makeText(
+                                    activity,
+                                    "TrueTime was initialized from ntp.aliyun.com failed, use system time",
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            }
+                            chooseTime.useTrueTime = false
+                            addScheledJob(chooseTime, activity)
+                            dispose()
+                        }
+                    }
+                )
+        } else {
+            addScheledJob(chooseTime, activity)
+        }
     }
 
 }

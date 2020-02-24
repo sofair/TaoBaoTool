@@ -8,6 +8,7 @@ import android.view.Gravity
 import android.app.Dialog
 import android.view.WindowManager
 import android.widget.LinearLayout
+import android.widget.Toast
 import com.mm.red.expansion.fillZero
 import com.qihoo.tbtool.R
 import com.qihoo.tbtool.core.taobao.view.wheelview.adapter.ArrayWheelAdapter
@@ -25,7 +26,14 @@ import java.util.*
 /**
  * 时间选择器保存对象
  */
-data class ChooseTime(var timeType: String, var hour: Int, var minutes: Int, var second: Int) {
+data class ChooseTime(
+    var timeType: String,
+    var hour: Int,
+    var minutes: Int,
+    var second: Int,
+    var millisecond: Int,
+    var useTrueTime: Boolean
+) {
     /**
      * 转换时间
      */
@@ -44,12 +52,12 @@ data class ChooseTime(var timeType: String, var hour: Int, var minutes: Int, var
         }
         c.set(Calendar.MINUTE, minutes)
         c.set(Calendar.SECOND, second)
-        c.set(Calendar.MILLISECOND, 0)
+        c.set(Calendar.MILLISECOND, millisecond)
         return c.timeInMillis
     }
 
     override fun toString(): String {
-        return "ChooseTime(timeType='$timeType', hour=$hour, minutes=$minutes, second=$second)"
+        return "ChooseTime(timeType='$timeType', hour=$hour, minutes=$minutes, second=$second, millisecond=$millisecond, useTrueTime=$useTrueTime)"
     }
 
 }
@@ -60,7 +68,7 @@ val AFTERNOON = "下午"
 class TimeChooseDialog(
     context: Context
     ,
-    val default: ChooseTime = ChooseTime(MORNING, 6, 30, 0),
+    val default: ChooseTime = ChooseTime(MORNING, 6, 30, 0, 0, false),
     val timeConfirmListener: (ChooseTime) -> Unit
 ) : Dialog(context),
     CoroutineScope by createMyScope() {
@@ -73,6 +81,11 @@ class TimeChooseDialog(
 
         val MINUTES = mutableListOf<String>().apply {
             repeat(60) {
+                add(it.fillZero())
+            }
+        }
+        val MILLISECONDS = mutableListOf<String>().apply {
+            repeat(1000) {
                 add(it.fillZero())
             }
         }
@@ -114,6 +127,15 @@ class TimeChooseDialog(
      */
     lateinit var wvSecond: WheelView<String>
 
+    /**
+     * 豪秒
+     */
+    // lateinit var wvMilliSecond: WheelView<String>
+
+    /**
+     *
+     */
+    // lateinit var wvUseTrueTime: ToggleButton
 
     private fun buildView(): View {
         return context.UI {
@@ -140,6 +162,15 @@ class TimeChooseDialog(
                         gravity = Gravity.CENTER
                         textColor = Color.parseColor("#FF333333")
                         textSize = 16f
+                        setOnLongClickListener {
+                            default.useTrueTime = !default.useTrueTime
+                            Toast.makeText(
+                                it.context,
+                                "Switch time to " + (if (default.useTrueTime) "TrueTime" else "SystemTime"),
+                                Toast.LENGTH_LONG
+                            ).show()
+                            false
+                        }
 
                     }.lparams(
                         0,
@@ -167,6 +198,27 @@ class TimeChooseDialog(
 
                 }.lparams(LinearLayout.LayoutParams.MATCH_PARENT, dip(44))
 
+//                linearLayout {
+//                    backgroundColor = Color.WHITE
+//                    orientation = LinearLayout.HORIZONTAL
+//
+//                    textView("使用TrueTime:") {
+//                        gravity = Gravity.CENTER
+//                        textColor = Color.parseColor("#FF35C759")
+//                        textSize = 16f
+//                    }.lparams(
+//                        LinearLayout.LayoutParams.WRAP_CONTENT,
+//                        LinearLayout.LayoutParams.MATCH_PARENT
+//                    )
+//
+//                    wvUseTrueTime = toggleButton()
+//                    wvUseTrueTime.lparams(
+//                        0,
+//                        LinearLayout.LayoutParams.MATCH_PARENT
+//                    ) {
+//                        weight = 1.0f
+//                    }
+//                }.lparams(LinearLayout.LayoutParams.MATCH_PARENT, dip(44))
 
                 linearLayout {
                     orientation = LinearLayout.HORIZONTAL
@@ -174,23 +226,32 @@ class TimeChooseDialog(
                     // 上午或下午
                     wvDayType = getWheelView(2.0f)
                     defaultWv(wvDayType, false, DAY_TYPE)
+                    wvDayType.selection = DAY_TYPE.indexOf(default.timeType)
                     addView(wvDayType)
 
                     // 时
                     wvHour = getWheelView(1.0f)
                     defaultWv(wvHour, true, HOURS)
+                    wvHour.selection = HOURS.indexOf(default.hour.toString())
                     addView(wvHour)
 
                     // 分
                     wvMinutes = getWheelView(1.0f)
-
                     defaultWv(wvMinutes, true, MINUTES)
+                    wvMinutes.selection = MINUTES.indexOf(default.minutes.toString())
                     addView(wvMinutes)
 
                     // 秒
                     wvSecond = getWheelView(1.0f)
                     defaultWv(wvSecond, true, MINUTES)
+                    wvSecond.selection = MINUTES.indexOf(default.second.toString())
                     addView(wvSecond)
+
+//                    // 豪秒
+//                    wvMilliSecond = getWheelView(1.0f)
+//                    defaultWv(wvMilliSecond, true, MILLISECONDS)
+//                    wvMilliSecond.selection = MILLISECONDS.indexOf(default.millisecond.toString())
+//                    addView(wvMilliSecond)
 
 
                 }.lparams(
@@ -253,6 +314,8 @@ class TimeChooseDialog(
         default.hour = wvHour.selectionItem.toInt()
         default.minutes = wvMinutes.selectionItem.toInt()
         default.second = wvSecond.selectionItem.toInt()
+        // default.millisecond = wvMilliSecond.selectionItem.toInt()
+        // default.useTrueTime = wvUseTrueTime.isChecked
         timeConfirmListener(default)
         dismiss()
     }
