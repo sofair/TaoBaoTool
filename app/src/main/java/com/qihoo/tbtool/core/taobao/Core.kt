@@ -66,7 +66,10 @@ object Core {
         SubmitOrderEvent.execute(activity)
     }
 
-    fun addScheledJob(chooseTime: ChooseTime, activity: Activity) {
+    /**
+     * 开始定时抢购
+     */
+    fun statTimeGo(chooseTime: ChooseTime, activity: Activity) {
         val context = activity.applicationContext
         val intent = activity.intent.clone() as Intent
         val itemId = intent.getStringExtra("item_id") ?: ""
@@ -93,52 +96,6 @@ object Core {
             }
         }
         JobManagers.addJob(itemId, job)
-    }
-
-    /**
-     * 开始定时抢购
-     */
-    fun statTimeGo(chooseTime: ChooseTime, activity: Activity) {
-        val context = activity.applicationContext
-        val intent = activity.intent.clone() as Intent
-        val itemId = intent.getStringExtra("item_id") ?: ""
-
-        if (chooseTime.useTrueTime) {
-            // 启动TrueTime
-            TrueTimeRx.build()
-                .initializeRx("ntp.aliyun.com")
-                .subscribeOn(Schedulers.io())
-                .subscribe(
-                    object : DisposableSingleObserver<Date>() {
-                        override fun onSuccess(date: Date) { // work with the resulting todos...
-                            mainScope.launch {
-                                Toast.makeText(
-                                    activity,
-                                    "TrueTime was initialized and we have a time from ntp.aliyun.com: $date",
-                                    Toast.LENGTH_SHORT
-                                ).show()
-                            }
-                            addScheledJob(chooseTime, activity)
-                            dispose()
-                        }
-                        override fun onError(throwable: Throwable) { // handle the error case...
-                            throwable.printStackTrace()
-                            mainScope.launch {
-                                Toast.makeText(
-                                    activity,
-                                    "TrueTime was initialized from ntp.aliyun.com failed, use system time",
-                                    Toast.LENGTH_SHORT
-                                ).show()
-                            }
-                            chooseTime.useTrueTime = false
-                            addScheledJob(chooseTime, activity)
-                            dispose()
-                        }
-                    }
-                )
-        } else {
-            addScheledJob(chooseTime, activity)
-        }
     }
 
 }

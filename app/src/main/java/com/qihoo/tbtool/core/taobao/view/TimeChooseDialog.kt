@@ -9,16 +9,22 @@ import android.app.Dialog
 import android.view.WindowManager
 import android.widget.LinearLayout
 import android.widget.Toast
+import com.instacart.library.truetime.TrueTimeRx
 import com.mm.red.expansion.fillZero
 import com.qihoo.tbtool.R
+import com.qihoo.tbtool.core.taobao.Core
 import com.qihoo.tbtool.core.taobao.view.wheelview.adapter.ArrayWheelAdapter
 import com.qihoo.tbtool.core.taobao.view.wheelview.common.WheelConstants.WHEEL_TEXT_SIZE
 import com.qihoo.tbtool.core.taobao.view.wheelview.widget.WheelView
 import com.qihoo.tbtool.expansion.createMyScope
+import com.qihoo.tbtool.expansion.l
+import com.qihoo.tbtool.expansion.mainScope
+import io.reactivex.observers.DisposableSingleObserver
+import io.reactivex.schedulers.Schedulers
 
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
 import org.jetbrains.anko.*
 import java.util.*
 
@@ -130,7 +136,7 @@ class TimeChooseDialog(
     /**
      * 豪秒
      */
-    // lateinit var wvMilliSecond: WheelView<String>
+    lateinit var wvMilliSecond: WheelView<String>
 
     /**
      *
@@ -166,9 +172,52 @@ class TimeChooseDialog(
                             default.useTrueTime = !default.useTrueTime
                             Toast.makeText(
                                 it.context,
-                                "Switch time to " + (if (default.useTrueTime) "TrueTime" else "SystemTime"),
+                                "Trying to use" + (if (default.useTrueTime) "TrueTime" else "SystemTime") + " mode",
                                 Toast.LENGTH_LONG
                             ).show()
+                            if (default.useTrueTime) {
+                                // reset to false
+                                default.useTrueTime = false
+                                // 启动TrueTime
+                                TrueTimeRx.build()
+                                    .initializeRx("ntp.aliyun.com")
+                                    .subscribeOn(Schedulers.io())
+                                    .subscribe(
+                                        object : DisposableSingleObserver<Date>() {
+                                            override fun onSuccess(date: Date) { // work with the resulting todos...
+                                                // always use system time
+                                                default.useTrueTime = false
+                                                val dt0 =
+                                                    TrueTimeRx.now().time - System.currentTimeMillis()
+                                                val dt1 =
+                                                    System.currentTimeMillis() - TrueTimeRx.now().time
+                                                val dt = (dt0 - dt1) / 2
+                                                mainScope.launch {
+                                                    Toast.makeText(
+                                                        it.context,
+                                                        "TrueTime was initialized and we have a time from ntp.aliyun.com: $date, difference from local systemtime is ($dt0, ${-dt1}, ${dt})ms",
+                                                        Toast.LENGTH_LONG
+                                                    ).show()
+                                                }
+                                                dispose()
+                                            }
+
+                                            override fun onError(throwable: Throwable) { // handle the error case...
+                                                default.useTrueTime = false
+                                                throwable.printStackTrace()
+                                                mainScope.launch {
+                                                    Toast.makeText(
+                                                        it.context,
+                                                        "TrueTime was initialized from ntp.aliyun.com failed, use system time",
+                                                        Toast.LENGTH_LONG
+                                                    ).show()
+                                                }
+                                                dispose()
+                                            }
+                                        }
+                                    )
+                            }
+
                             false
                         }
 
@@ -247,11 +296,11 @@ class TimeChooseDialog(
                     wvSecond.selection = MINUTES.indexOf(default.second.toString())
                     addView(wvSecond)
 
-//                    // 豪秒
-//                    wvMilliSecond = getWheelView(1.0f)
-//                    defaultWv(wvMilliSecond, true, MILLISECONDS)
-//                    wvMilliSecond.selection = MILLISECONDS.indexOf(default.millisecond.toString())
-//                    addView(wvMilliSecond)
+                    // 豪秒
+                    wvMilliSecond = getWheelView(1.0f)
+                    defaultWv(wvMilliSecond, true, MILLISECONDS)
+                    wvMilliSecond.selection = MILLISECONDS.indexOf(default.millisecond.toString())
+                    addView(wvMilliSecond)
 
 
                 }.lparams(
@@ -314,7 +363,7 @@ class TimeChooseDialog(
         default.hour = wvHour.selectionItem.toInt()
         default.minutes = wvMinutes.selectionItem.toInt()
         default.second = wvSecond.selectionItem.toInt()
-        // default.millisecond = wvMilliSecond.selectionItem.toInt()
+        default.millisecond = wvMilliSecond.selectionItem.toInt()
         // default.useTrueTime = wvUseTrueTime.isChecked
         timeConfirmListener(default)
         dismiss()
