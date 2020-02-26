@@ -6,9 +6,9 @@ import android.graphics.drawable.ColorDrawable
 import android.view.View
 import android.view.Gravity
 import android.app.Dialog
+import android.text.InputType
 import android.view.WindowManager
-import android.widget.LinearLayout
-import android.widget.Toast
+import android.widget.*
 import com.instacart.library.truetime.TrueTimeRx
 import com.mm.red.expansion.fillZero
 import com.qihoo.tbtool.R
@@ -29,6 +29,11 @@ import org.jetbrains.anko.*
 import java.util.*
 
 
+data class TwoVal<T>  (
+var t1: T,
+var t2:T
+){}
+
 /**
  * 时间选择器保存对象
  */
@@ -38,7 +43,9 @@ data class ChooseTime(
     var minutes: Int,
     var second: Int,
     var millisecond: Int,
-    var useTrueTime: Boolean
+    var useTrueTime: Boolean,
+    var isGrabCrazyMode: Boolean,
+    var crazyInterval: TwoVal<Int>
 ) {
     /**
      * 转换时间
@@ -59,11 +66,18 @@ data class ChooseTime(
         c.set(Calendar.MINUTE, minutes)
         c.set(Calendar.SECOND, second)
         c.set(Calendar.MILLISECOND, millisecond)
+
+        // 距离当前时间不超过12小时
+        if( (System.currentTimeMillis() - c.timeInMillis) > 12 * 3600000){
+            c.add(Calendar.DATE, -1)
+        }
         return c.timeInMillis
     }
 
     override fun toString(): String {
-        return "ChooseTime(timeType='$timeType', hour=$hour, minutes=$minutes, second=$second, millisecond=$millisecond, useTrueTime=$useTrueTime)"
+        return ("ChooseTime(timeType='$timeType',"
+                + " hour=$hour, minutes=$minutes, second=$second,"
+                + " millisecond=$millisecond, useTrueTime=$useTrueTime)")
     }
 
 }
@@ -74,7 +88,11 @@ val AFTERNOON = "下午"
 class TimeChooseDialog(
     context: Context
     ,
-    val default: ChooseTime = ChooseTime(MORNING, 6, 30, 0, 0, false),
+    val default: ChooseTime = ChooseTime(MORNING, 6, 30, 0, 0,
+        useTrueTime = false,
+        isGrabCrazyMode = false,
+        crazyInterval = TwoVal(0,0)
+    ),
     val timeConfirmListener: (ChooseTime) -> Unit
 ) : Dialog(context),
     CoroutineScope by createMyScope() {
@@ -92,7 +110,7 @@ class TimeChooseDialog(
         }
         val MILLISECONDS = mutableListOf<String>().apply {
             repeat(1000) {
-                add(it.fillZero())
+                add(it.fillZero(3))
             }
         }
     }
@@ -142,6 +160,14 @@ class TimeChooseDialog(
      *
      */
     // lateinit var wvUseTrueTime: ToggleButton
+
+    /**
+     * Crazy mode
+     */
+    lateinit var tbIsGrabCrazyMode: ToggleButton
+    lateinit var etCrazyIntervalLow: EditText
+    lateinit var etCrazyInterval: EditText
+    lateinit var tvCrazyDash: TextView
 
     private fun buildView(): View {
         return context.UI {
@@ -247,27 +273,76 @@ class TimeChooseDialog(
 
                 }.lparams(LinearLayout.LayoutParams.MATCH_PARENT, dip(44))
 
-//                linearLayout {
-//                    backgroundColor = Color.WHITE
-//                    orientation = LinearLayout.HORIZONTAL
-//
-//                    textView("使用TrueTime:") {
-//                        gravity = Gravity.CENTER
-//                        textColor = Color.parseColor("#FF35C759")
-//                        textSize = 16f
-//                    }.lparams(
-//                        LinearLayout.LayoutParams.WRAP_CONTENT,
-//                        LinearLayout.LayoutParams.MATCH_PARENT
-//                    )
-//
-//                    wvUseTrueTime = toggleButton()
-//                    wvUseTrueTime.lparams(
-//                        0,
-//                        LinearLayout.LayoutParams.MATCH_PARENT
-//                    ) {
-//                        weight = 1.0f
-//                    }
-//                }.lparams(LinearLayout.LayoutParams.MATCH_PARENT, dip(44))
+                linearLayout {
+                    backgroundColor = Color.WHITE
+                    orientation = LinearLayout.HORIZONTAL
+
+                    textView("疯狂模式？") {
+                        gravity = Gravity.CENTER
+                        textColor = Color.parseColor("#FF35C759")
+                        textSize = 16f
+                    }.lparams(
+                        LinearLayout.LayoutParams.WRAP_CONTENT,
+                        LinearLayout.LayoutParams.MATCH_PARENT
+                    )
+
+                    tbIsGrabCrazyMode = toggleButton()
+                    tbIsGrabCrazyMode.lparams(
+                        LinearLayout.LayoutParams.WRAP_CONTENT,
+                        LinearLayout.LayoutParams.MATCH_PARENT
+                    )
+
+                    tbIsGrabCrazyMode.setOnCheckedChangeListener { buttonView, isChecked ->
+                        etCrazyInterval?.isEnabled = isChecked
+                        tvCrazyDash?.isEnabled = isChecked
+                        etCrazyIntervalLow?.isEnabled = isChecked
+                    }
+
+                    etCrazyIntervalLow = editText("0")
+                    etCrazyIntervalLow.lparams(
+                        0,
+                        LinearLayout.LayoutParams.MATCH_PARENT
+                    ) {
+                        weight = 1.0f
+                    }
+                    etCrazyIntervalLow.inputType = InputType.TYPE_CLASS_NUMBER
+                    etCrazyIntervalLow.isEnabled = false
+                    etCrazyIntervalLow.hint = "小于等于0无间隔尝试!!!可能会导致手机卡死!!!"
+
+                    tvCrazyDash = textView("-") {
+                        gravity = Gravity.CENTER
+                        textColor = Color.parseColor("#FF35C759")
+                        textSize = 16f
+                    }
+                    tvCrazyDash.lparams(
+                        LinearLayout.LayoutParams.WRAP_CONTENT,
+                        LinearLayout.LayoutParams.MATCH_PARENT
+                    )
+
+                    etCrazyInterval = editText("0")
+                    etCrazyInterval.lparams(
+                        0,
+                        LinearLayout.LayoutParams.MATCH_PARENT
+                    ) {
+                        weight = 1.0f
+                    }
+                    etCrazyInterval.inputType = InputType.TYPE_CLASS_NUMBER
+                    etCrazyInterval.isEnabled = false
+                    etCrazyInterval.hint = "小于等于0无间隔尝试!!!可能会导致手机卡死!!!"
+
+                    textView("ms") {
+                        gravity = Gravity.CENTER
+                        textColor = Color.parseColor("#FF35C759")
+                        textSize = 16f
+                    }.lparams(
+                        LinearLayout.LayoutParams.WRAP_CONTENT,
+                        LinearLayout.LayoutParams.MATCH_PARENT
+                    )
+
+
+                }.lparams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT)
 
                 linearLayout {
                     orientation = LinearLayout.HORIZONTAL
@@ -287,19 +362,19 @@ class TimeChooseDialog(
                     // 分
                     wvMinutes = getWheelView(1.0f)
                     defaultWv(wvMinutes, true, MINUTES)
-                    wvMinutes.selection = MINUTES.indexOf(default.minutes.toString())
+                    wvMinutes.selection = MINUTES.indexOf(default.minutes.fillZero())
                     addView(wvMinutes)
 
                     // 秒
                     wvSecond = getWheelView(1.0f)
                     defaultWv(wvSecond, true, MINUTES)
-                    wvSecond.selection = MINUTES.indexOf(default.second.toString())
+                    wvSecond.selection = MINUTES.indexOf(default.second.fillZero())
                     addView(wvSecond)
 
                     // 豪秒
                     wvMilliSecond = getWheelView(1.0f)
                     defaultWv(wvMilliSecond, true, MILLISECONDS)
-                    wvMilliSecond.selection = MILLISECONDS.indexOf(default.millisecond.toString())
+                    wvMilliSecond.selection = MILLISECONDS.indexOf(default.millisecond.fillZero(3))
                     addView(wvMilliSecond)
 
 
@@ -365,6 +440,11 @@ class TimeChooseDialog(
         default.second = wvSecond.selectionItem.toInt()
         default.millisecond = wvMilliSecond.selectionItem.toInt()
         // default.useTrueTime = wvUseTrueTime.isChecked
+        default.isGrabCrazyMode = tbIsGrabCrazyMode.isChecked
+        default.crazyInterval = TwoVal(
+            etCrazyIntervalLow.text.toString().toInt(),
+            etCrazyInterval.text.toString().toInt()
+        )
         timeConfirmListener(default)
         dismiss()
     }

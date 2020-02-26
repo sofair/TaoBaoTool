@@ -18,10 +18,6 @@ fun BigDecimal.trimZero(): String {
     return s
 }
 
-fun Number.fillZero(): String {
-    return if (toLong() > 9) {
-        toString()
-    } else {
-        "0${toShort()}"
-    }
+fun Number.fillZero(length:Int=2): String {
+    return toString().padStart(length, '0')
 }

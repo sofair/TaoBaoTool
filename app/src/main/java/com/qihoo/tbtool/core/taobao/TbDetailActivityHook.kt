@@ -16,6 +16,8 @@ import de.robv.android.xposed.callbacks.XC_LoadPackage
 
 
 object TbDetailActivityHook {
+    const val IS_GRAB_CRAZY = "IS_GRAB_CRAZY"
+    const val CRAZY_INTERVAL = "CRAZY_INTERVAL"
     /**
      * 是否是秒杀 Activity
      */
@@ -43,6 +45,8 @@ object TbDetailActivityHook {
                     val isInject = activity.intent.getBooleanExtra(IS_INJECT, false)
                     val isKill = activity.intent.getBooleanExtra(IS_KILL, false)
                     val isKillGo = activity.intent.getBooleanExtra(IS_KILL_GO, false)
+                    val isCrazy = activity.intent.getBooleanExtra(IS_GRAB_CRAZY, false)
+                    val crazyInterval = activity.intent.getIntArrayExtra(CRAZY_INTERVAL) ?: intArrayOf(0, 0)
 
                     // 判断是否是秒杀界面
                     if (isKill) {
@@ -80,7 +84,7 @@ object TbDetailActivityHook {
     /**
      * 注入抢购按钮
      */
-    private fun injectView(activity: Activity) {
+    fun injectView(activity: Activity) {
         val group = activity.findViewById<View>(android.R.id.content) as ViewGroup
         InjectView(activity).getRootView().let(group::addView)
     }

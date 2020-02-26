@@ -16,6 +16,7 @@ import com.qihoo.tbtool.core.taobao.TbDetailActivityHook
 import com.qihoo.tbtool.expansion.l
 import kotlinx.coroutines.NonCancellable.start
 import org.jetbrains.anko.*
+import java.io.File
 
 val icon_start by lazy {
 
@@ -55,8 +56,9 @@ class InjectView(val activity: Activity) {
 
     fun buidView() {
         val item_id = activity.intent.getStringExtra("item_id") ?: ""
+        val is_crazy = activity.intent.getBooleanExtra(TbDetailActivityHook.IS_GRAB_CRAZY, false)
         timeIcon?.apply {
-            imageBitmap = if (JobManagers.haveJob(item_id)) {
+            imageBitmap = if (is_crazy || JobManagers.haveJob(item_id)) {
                 icon_stop
             } else {
                 icon_time
@@ -66,6 +68,7 @@ class InjectView(val activity: Activity) {
 
     fun getRootView(): View {
         val item_id = activity.intent.getStringExtra("item_id") ?: ""
+        val is_crazy = activity.intent.getBooleanExtra(TbDetailActivityHook.IS_GRAB_CRAZY, false)
         val rootView = activity.UI {
             verticalLayout {
                 layoutParams = FrameLayout.LayoutParams(
@@ -86,20 +89,30 @@ class InjectView(val activity: Activity) {
                 }
 
                 timeIcon = imageView {
-                    imageBitmap = if (JobManagers.haveJob(item_id)) {
+                    imageBitmap = if (is_crazy || JobManagers.haveJob(item_id)) {
                         icon_stop
                     } else {
                         icon_time
                     }
 
                     setOnClickListener {
-                        if (JobManagers.haveJob(item_id)) {
-                            JobManagers.removeJob(item_id)
+                        if (is_crazy){
+                            val file = File(
+                                activity.filesDir,
+                                "crazy.txt"
+                            )
+                            if (file.exists())
+                                file.delete()
                             imageBitmap = icon_time
-                        } else {
-                            timeGo {
-                                statTimeGo(it, activity)
-                                imageBitmap = icon_stop
+                        }else{
+                            if (JobManagers.haveJob(item_id)) {
+                                JobManagers.removeJob(item_id)
+                                imageBitmap = icon_time
+                            } else {
+                                timeGo {
+                                    statTimeGo(it, activity)
+                                    imageBitmap = icon_stop
+                                }
                             }
                         }
                     }

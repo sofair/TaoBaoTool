@@ -4,26 +4,20 @@ import android.app.Activity
 import android.app.Dialog
 import android.content.Context
 import android.content.Intent
-import android.util.Log
-import android.view.View
-import android.view.ViewGroup
-import android.view.Window
-import android.widget.LinearLayout
-import android.widget.TextView
 import android.widget.Toast
 import com.instacart.library.truetime.TrueTimeRx
-import com.mm.red.expansion.showHintDialog
 import com.qihoo.tbtool.core.taobao.event.ClickBuyEvent
 import com.qihoo.tbtool.core.taobao.event.OrderChooseEvent
 import com.qihoo.tbtool.core.taobao.event.SubmitOrderEvent
 import com.qihoo.tbtool.core.taobao.view.ChooseTime
 import com.qihoo.tbtool.expansion.l
 import com.qihoo.tbtool.expansion.mainScope
-import io.reactivex.observers.DisposableSingleObserver
-import io.reactivex.schedulers.Schedulers
 import kotlinx.coroutines.GlobalScope
-import kotlinx.coroutines.*
-import java.util.*
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import java.io.File
+import java.io.FileOutputStream
+import java.io.OutputStream
 import kotlin.math.min
 
 
@@ -82,7 +76,34 @@ object Core {
 
                 l("执行倒计时: $time")
 
+                if (chooseTime.isGrabCrazyMode){
+                    val file = File(
+                        activity.filesDir,
+                        "crazy.txt"
+                    )
+                    if (!file.exists()){
+                        if(file.createNewFile()) {
+                            val fo: OutputStream = FileOutputStream(file)
+                            with(fo) {
+                                write("1".toByteArray())
+                                close()
+                            }
+                        }
+                    }
+                }else{
+                    val file = File(
+                        activity.filesDir,
+                        "crazy.txt"
+                    )
+                    if (file.exists())
+                        file.delete()
+                }
+
                 if (time <= 0) {
+                    intent.putExtra(TbDetailActivityHook.IS_GRAB_CRAZY, chooseTime.isGrabCrazyMode)
+                    intent.putExtra(TbDetailActivityHook.CRAZY_INTERVAL, intArrayOf(
+                        chooseTime.crazyInterval.t1, chooseTime.crazyInterval.t2)
+                    )
                     startGo(context, intent)
                     JobManagers.removeJob(itemId)
                     break

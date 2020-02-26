@@ -4,11 +4,16 @@ import android.app.Activity
 import android.content.Intent
 import android.view.ViewGroup
 import android.widget.TextView
+import android.widget.Toast
 import com.mm.red.expansion.showHintDialog
 import com.qihoo.tbtool.core.taobao.Core
+import com.qihoo.tbtool.core.taobao.TbDetailActivityHook
 import com.qihoo.tbtool.expansion.l
 import com.qihoo.tbtool.expansion.mainScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import java.io.File
+import java.lang.Math.random
 
 /**
  * 点击立即购买按钮
@@ -31,7 +36,48 @@ object ClickBuyEvent : BaseEvent() {
                 // 未出售光,点击购买按钮
                 clickBuyBtn(activity)
             } else {
-                activity.showHintDialog("提示", "检测到物品:$hintText") {}
+
+                val is_crazy = activity.intent.getBooleanExtra(TbDetailActivityHook.IS_GRAB_CRAZY, false)
+                if (is_crazy) {
+                    val crazyInterval =
+                        activity.intent.getIntArrayExtra(TbDetailActivityHook.CRAZY_INTERVAL)
+                    crazyInterval?.let {
+                        val lb = it[0]
+                        val ub = if (it[1]>it[0]) it[1] else it[0]
+                        val ci = lb + (ub-lb) * random()
+
+                        if (ci > 10000) {
+                            Toast.makeText(
+                                activity,
+                                "检测到物品:$hintText" + ", 等待" + ci / 1000.0 + "秒进行下次尝试",
+                                Toast.LENGTH_LONG
+                            ).show()
+
+                            // 注入抢购按钮
+                             TbDetailActivityHook.injectView(activity)
+                        }
+
+                        if (ci > 0)
+                            delay(ci.toLong())
+
+                        val file = File(
+                            activity.filesDir,
+                            "crazy.txt"
+                        )
+                        if (file.exists()) {
+                            throw Exception()
+                        }else{
+                            Toast.makeText(
+                                activity,
+                                "疯狂模式终止",
+                                Toast.LENGTH_LONG
+                            ).show()
+                        }
+                    }
+
+                } else {
+                    activity.showHintDialog("提示", "检测到物品:$hintText") {}
+                }
             }
 
 
