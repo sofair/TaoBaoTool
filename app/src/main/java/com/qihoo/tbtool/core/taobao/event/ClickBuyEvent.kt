@@ -49,7 +49,7 @@ object ClickBuyEvent : BaseEvent() {
                         if (ci > 10000) {
                             Toast.makeText(
                                 activity,
-                                "检测到物品:$hintText" + ", 等待" + ci / 1000.0 + "秒进行下次尝试",
+                                "检测到物品:$hintText" + ", 等待" + "%.3f".format(ci / 1000.0) + "秒进行下次尝试",
                                 Toast.LENGTH_LONG
                             ).show()
 
